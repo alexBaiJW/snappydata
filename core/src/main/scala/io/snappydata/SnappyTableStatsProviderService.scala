@@ -19,6 +19,8 @@
 
 package io.snappydata
 
+import java.util.concurrent.TimeUnit
+
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
@@ -178,13 +180,14 @@ object SnappyEmbeddedTableStatsProviderService extends TableStatsProviderService
 
   override def getStatsFromAllServers(sc: Option[SparkContext] = None): (Seq[SnappyRegionStats],
       Seq[SnappyIndexStats]) = {
+    val currTableSizeInfo = tableSizeInfo.values.toSeq
     var result = new java.util.ArrayList[SnappyRegionStatsCollectorResult]().asScala
     val dataServers = GfxdMessage.getAllDataStores
     try {
       if (dataServers != null && dataServers.size() > 0) {
         result = FunctionService.onMembers(dataServers)
-            .withCollector(new GfxdListResultCollector())
-            .execute(SnappyRegionStatsCollectorFunction.ID).getResult().
+            // .withCollector(new GfxdListResultCollector())
+            .execute(SnappyRegionStatsCollectorFunction.ID).getResult(5, TimeUnit.SECONDS).
             asInstanceOf[java.util.ArrayList[SnappyRegionStatsCollectorResult]]
             .asScala
       }
@@ -192,7 +195,15 @@ object SnappyEmbeddedTableStatsProviderService extends TableStatsProviderService
     catch {
       case NonFatal(e) => log.warn(e.getMessage, e)
     }
-    (result.flatMap(_.getRegionStats.asScala), result.flatMap(_.getIndexStats.asScala))
+
+    if(result.flatMap(_.getRegionStats.asScala).size == 0){
+      // Return last updated tableSizeInfo
+      (currTableSizeInfo, result.flatMap(_.getIndexStats.asScala))
+    }else{
+      // Return updated tableSizeInfo
+      (result.flatMap(_.getRegionStats.asScala), result.flatMap(_.getIndexStats.asScala))
+    }
+
   }
 
   def publishColumnTableRowCountStats(): Unit = {

@@ -32,7 +32,7 @@ import org.apache.spark.{Logging, SparkContext}
 trait TableStatsProviderService extends Logging {
 
   @volatile
-  private var tableSizeInfo = Map.empty[String, SnappyRegionStats]
+  protected var tableSizeInfo = Map.empty[String, SnappyRegionStats]
   @volatile
   private var indexesInfo = Map.empty[String, SnappyIndexStats]
   protected val membersInfo: TrieMap[String, mutable.Map[String, Any]] =
